@@ -1,0 +1,13 @@
+Valery Sedletski is a microkernel enthusiast and OS/2 user. Participating
+in osFree project (aiming to replace all OS/2 subsystems with opensource
+analogues), including the kernel too. The kernel of choice is L4 
+(originally, L4Ka::Pistachio, then target moved to L4/Fiasco and 
+Fiasco.OC). Our "OS/2 personality" prototype is currently working 
+under l4env, and port to Genode is in progress. My dream is an 
+IBM Workplace OS reincarnation on new technological level 
+(replacing Mach microkernel with Genode on top of L4 family 
+kernels is a perfect choice).
+
+*GitHub* [https://github.com/valerius2k - valerius]
+
+*Company* [https://osfree.org - osFree project]

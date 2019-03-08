@@ -1,2 +1,102 @@
           Remote booting of x86 machines with PXE and Intel AMT
 
+Two weeks ago, I ordered a refurbished Thinkpad T420, which is compatible
+with many OS'es, including Genode/Sculpt. It is listed in cnuke's Genode
+unofficial [http://usr.sysret.de/jws/genode/hcl.html - HCL]. So, I, from
+the beginning, wanted to set up the usual workflow of Genode developers.
+
+This workflow uses standard run tool with special backends, related to
+remote PXE boot and Intel AMT for remotely controlling the machine.
+
+Intel AMT basics.
+-----------------
+
+In case of x86 machines with Intel AMT (usually, all newer Thinkpads), it 
+is possible to remotely control the machine in different ways. Genode run
+tool uses Intel AMT for:
+
+# Remotely powering on or off the machine
+# getting the log output via AMT SOL (Serial over LAN) COM port.
+
+Intel AMT is a remote management technology. Most newer machines (IIRC, 
+all Intel Core i5/i7/Xeon machines) have Intel Management Engine built-in.
+Intel AMT is just one module of Intel ME. Intel AMT has a chip with
+its own firmware (based on Minix3). The firmware has its own IP stack with
+a HTTP, VNC servers, and a SOL (Serial over LAN) service.
+
+After you go to BIOS setup and enable Intel AMT, and enable required 
+services and configure IP stack, you'll have a second IP enabled on your
+LAN interface. This IP accepts connections even if your machine is
+switched off.
+
+AMT SOL is seen on a PCI bus as a standard "Communication" device, so you
+can access it as a standard PCI COM port, via it's I/O address. You can 
+write to it like to any hardware COM port. The debug output can be got
+via network with a special utility ("amtterm" package in Debian/Ubuntu).
+
+BIOS setup settings.
+--------------------
+
+I'll describe BIOS setup settings for usual Thinkpad's UEFI BIOS. First,
+you should go to Config->Intel(R) AMT and set "Intel (R) AMT Control" to
+"Enabled". Here, you can also set a timeout (0) and "Console Type" ("PC 
+ANSI" in my case).
+
+Then reboot the system, saving changes and press the blue "ThinkVantage"
+button, and then Ctrl-P. Press "1" to go to Intel ME setup.
+
+Then you need to set up a valid Intel ME password. The default user is
+"admin" and password is "admin". But until you change the password to some
+"secure" password, the setup will refuse to do anything on.
+
+The valid password is "P@ssw0rd", but "Passw0rd" is insufficiently secure.
+So, you should use a password, using letters on a different case, plus some
+numbers, plus some symbols like "@#$%". Otherwise the setup will consider it
+being insufficiently secure.
+
+After you set up your ME password, you could go to "Intel(R) AMT Configuration":
+
+At "SOL/IDER/KVM" section, you should enable SOL and "Legacy Redirection Mode".
+
+At "User Consent", you should select:
+
+# User Opt-in: None
+# Opt-in Configurable from Remote IT -> Enable Remote Control of Opt-In Policy
+
+At "Password policy" section: "Default Password Only".
+
+At Network Setup section: Here you should enter all usual IP stack settings
+like
+
+* host name
+* domain name
+* IP address
+* subnet mask
+* DNS servers
+* default gateway
+
+Personally, I did not set up DHCP/DDNS, and assigned all addresses static here.
+
+This should be sufficient for remote powering on/off, accessing SOL and HTTP
+servers via network.
+
+Web interface is accessible as http://<your-IP>:16992/
+AMT SOL service is listening port 16994, you can attach to it via a command:
+
+! amtterm -u admin -p <your-amt-password> <your-IP>
+
+Also, you could try to enable a VNC KVM, so you'll be able to take screenshots,
+but it's beyond the scope of this article (AFAIK, it requires a windows utility
+from Intel, didn't tried to use it so far).
+
+Base run tool setup.
+--------------------
+
+The workflow is using a feature of a Genode's run tool, allowing to easily
+switch the run tool backends. There are backends for:
+
+# creating the boot directory for different kernels
+# creating the boot image (disk, uboot, iso image, etc.)
+# for loading the image (via tftp, ipxe, jtag debugger etc)
+# for powering the machine on and off
+# for getting the LOG output from the system under test

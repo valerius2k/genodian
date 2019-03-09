@@ -16,7 +16,7 @@ In case of x86 machines with Intel AMT (usually, all newer Thinkpads), it
 is possible to remotely control the machine in different ways. Genode run
 tool uses Intel AMT for:
 
-# Remotely powering on or off the machine
+# Remotely powering on/off the machine
 # getting the log output via AMT SOL (Serial over LAN) COM port.
 
 Intel AMT is a remote management technology. Most newer machines (IIRC, 
@@ -247,5 +247,4 @@ Credits:
 --------
 
 * Alexander Boettcher for pointing me at my fault with the NX bit disabled 
-* Christian Helmuth and Josef Soentgen on #genode irc channel, for helping me to get
-a working setup with AMT SOL and PXE boot.
+* Christian Helmuth and Josef Soentgen on #genode irc channel, for helping me to get a working setup with AMT SOL and PXE boot.

@@ -1,5 +1,6 @@
           Remote booting of x86 machines with PXE and Intel AMT
 
+
 Two weeks ago, I ordered a refurbished Thinkpad T420, which is compatible
 with many OS'es, including Genode/Sculpt. It is listed in cnuke's Genode
 unofficial [http://usr.sysret.de/jws/genode/hcl.html - HCL]. So, I, from
@@ -38,7 +39,7 @@ BIOS setup settings.
 --------------------
 
 I'll describe BIOS setup settings for usual Thinkpad's UEFI BIOS. First,
-you should go to Config->Intel(R) AMT and set "Intel (R) AMT Control" to
+you should go to "Config->Intel(R) AMT" and set "Intel (R) AMT Control" to
 "Enabled". Here, you can also set a timeout (0) and "Console Type" ("PC 
 ANSI" in my case).
 
@@ -50,7 +51,7 @@ Then you need to set up a valid Intel ME password. The default user is
 "secure" password, the setup will refuse to do anything on.
 
 The valid password is "P@ssw0rd", but "Passw0rd" is insufficiently secure.
-So, you should use a password, using letters on a different case, plus some
+So, you should use a password, using letters of a different case, plus some
 numbers, plus some symbols like "@#$%". Otherwise the setup will consider it
 being insufficiently secure.
 
@@ -85,7 +86,7 @@ servers via network.
 
 Web interface is accessible as http://<your-IP>:16992/
 
-AMT SOL service is listening port 16994, you can attach to it via a command:
+AMT SOL service is listening at port 16994, you can attach to it via a command:
 
 ! amtterm -u admin -p <your-amt-password> <your-IP>
 
@@ -138,7 +139,7 @@ utility, to remotely power-on the machine. Wsman is a pair of an "openwsman" lib
 and "wsmancli" command line utility, which uses SOAP RPC to an AMT HTTP server.
 
 Unfortunately, "wsman" is missing in Debian packages (so, I needed to build it from
-source), but there is "wsmancli" package in Ubuntu. "Amtterm" is present in both 
+sources), but there is "wsmancli" package in Ubuntu. "Amtterm" is present in both 
 Debian and Ubuntu.
 
 So, you should do 
@@ -191,7 +192,7 @@ Also, here are the following DHCP options used:
 TFTP server setup.
 ------------------
 
-As a tftp server, I use tftpd-hpa. The Debian package is named the same way My 
+As a tftp server, I use tftpd-hpa. The Debian package is named the same way. My 
 settings in "/etc/default/tftpd-hpa" are as follows:
 
 ! TFTP_USERNAME="tftp"
@@ -209,7 +210,7 @@ Booting your test machine.
 --------------------------
 
 Now, you should put "pulsar" binary and its config file in the form:
-"config-<your-mac-address-bytes-delimited-by-dashes>":
+"config-<your-mac-address-bytes-delimited-by-dashes>" to your tftp server root:
 
 ! # tftp 172.30.0.101
 ! root /var/lib/tftpboot/x86
@@ -219,7 +220,7 @@ The "root" command changes the root directory for "pulsar" to your build directo
 (pointed to by the /var/lib/tftpboot/x86 symlink). Then it switches to the new 
 config file "config-00-00-00-00-00-00" located there. The build system automatically
 creates the "config-00-00-00-00-00-00" file in the build directory root, which, in 
-turn, points to an config-52-54-00-12-34-56 file in /var/lib/tftpboot/x86/var/run/sculpt_test
+turn, points to a config-52-54-00-12-34-56 file in /var/lib/tftpboot/x86/var/run/sculpt_test
 directory, in case you issued a
 
 ! make KERNEL=nova run/sculpt_test
@@ -234,7 +235,7 @@ machine.
 Known problems.
 ---------------
 
-During my attempts to boot Sculpt remotely, I encountered a problem: I had an NX bit
+During my attempts to boot Sculpt remotely, I encountered a problem: I had a NX bit
 disabled in my BIOS setup. This caused most 64-bit kernels to reboot or trap. 32-bit
 kernels booted successfully, though, because NX bit (aka Execute Prevention) is usually
 enabled on 32-bit systems only in conjunction with PAE feature, which was disabled in

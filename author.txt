@@ -10,4 +10,4 @@ kernels is a perfect choice).
 
 *GitHub* [https://github.com/valerius2k - valerius]
 
-*Company* [https://osfree.org - osFree project]
+*Company* [http://osfree.org - osFree project]

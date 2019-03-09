@@ -8,6 +8,6 @@ IBM Workplace OS reincarnation on new technological level
 (replacing Mach microkernel with Genode on top of L4 family 
 kernels is a perfect choice).
 
-*GitHub* [https://github.com/valerius2k - valerius]
+*GitHub* [https://github.com/valerius2k - valerius2k]
 
 *Company* [http://osfree.org - osFree project]

@@ -20,7 +20,7 @@ tool uses Intel AMT for:
 
 Intel AMT is a remote management technology. Most newer machines (IIRC, 
 all Intel Core i5/i7/Xeon machines) have Intel Management Engine built-in.
-Intel AMT is just one module of Intel ME. Intel AMT has a chip with
+Intel AMT is just one module of Intel ME. Intel ME has a chip with
 its own firmware (based on Minix3). The firmware has its own IP stack with
 a HTTP, VNC servers, and a SOL (Serial over LAN) service.
 
@@ -63,6 +63,9 @@ At "User Consent", you should select:
 # User Opt-in: None
 # Opt-in Configurable from Remote IT -> Enable Remote Control of Opt-In Policy
 
+-- this is to avoid the user at the controlled machine to acknowledge each your
+remote action (which is annoying).
+
 At "Password policy" section: "Default Password Only".
 
 At Network Setup section: Here you should enter all usual IP stack settings
@@ -81,6 +84,7 @@ This should be sufficient for remote powering on/off, accessing SOL and HTTP
 servers via network.
 
 Web interface is accessible as http://<your-IP>:16992/
+
 AMT SOL service is listening port 16994, you can attach to it via a command:
 
 ! amtterm -u admin -p <your-amt-password> <your-IP>
@@ -92,11 +96,155 @@ from Intel, didn't tried to use it so far).
 Base run tool setup.
 --------------------
 
-The workflow is using a feature of a Genode's run tool, allowing to easily
-switch the run tool backends. There are backends for:
+The usual Genode  development workflow is using a feature of a Genode's run tool, 
+allowing to easily switch the run tool backends. There are backends for:
 
 # creating the boot directory for different kernels
 # creating the boot image (disk, uboot, iso image, etc.)
 # for loading the image (via tftp, ipxe, jtag debugger etc)
 # for powering the machine on and off
-# for getting the LOG output from the system under test
+# for getting the LOG output from the system under test (via AMT, serial, qemu etc.)
+
+So, for using PXE and Intel AMT, you should comment the "power_on/qemu", "log/qemu"
+and "image/iso" backends in your "etc/build.conf" in your build directory and add
+the following section instead:
+
+! # QEMU_RUN_OPT := --include power_on/qemu  --include log/qemu --include image/iso
+! RUN_OPT := --include power_on/amt \
+!                   --power-on-amt-host 172.30.0.140 \
+!                   --power-on-amt-password 'P@ssw0rd' \
+!                   --power-on-amt-timeout 20 \
+!            --include load/tftp \
+!                   --load-tftp-absolute \
+!                   --load-tftp-base-dir /var/lib/tftpboot \
+!                   --load-tftp-offset-dir /x86 \
+!            --amt-tool wsman \
+!            --include log/amt \
+!                   --log-amt-host 172.30.0.140 \
+!                   --log-amt-password 'P@ssw0rd'
+
+Here, IP address, and password for "power_on/amt" and "log/amt" are self-explaining.
+Also, it is useful to increase the power on timeout to 20 seconds, because by default
+the timeout is as small as 5 seconds, which could be insufficient.
+
+The "--load-tftp-absolute" enables absolute paths passed by the run tool to a tftp 
+server. "--load-tftp-base-dir" sets up the tftp server root. The build system creates a
+"x86" symlink, pointing to your build directory, in the TFTP root. The name of this
+symlink is set up in the "--load-tftp-offset-dir" parameter.
+
+Also, my config contains the "--amt-tool wsman" parameter, which seems to be not 
+mandatory, but I have it. In addition to "amtterm", the run tool uses a "wsman"
+utility, to remotely power-on the machine. Wsman is a pair of an "openwsman" library
+and "wsmancli" command line utility, which uses SOAP RPC to an AMT HTTP server.
+
+Unfortunately, "wsman" is missing in Debian packages (so, I needed to build it from
+source), but there is "wsmancli" package in Ubuntu. "Amtterm" is present in both 
+Debian and Ubuntu.
+
+So, you should do 
+
+! apt-get install wsmancli amtterm
+
+to have the packages installed.
+
+
+To boot Genode remotely, you need to have a usual PXE boot setup. First, you should
+change the boot device priorities in BIOS setup, so that, your test machine will boot
+from network by default. Most probably, you should use a wired LAN card, as wifi cards
+with boot ROM's are rare. So, when the system tries to boot from network, it sends
+a broadcast DHCP "discover" request, to find a DHCP server. When DHCP server is found,
+the boot ROM gets IP settings from it, and different DHCP options, which set up the 
+bootable image name at the tftp server, tftp server IP address, gateway IP address etc.
+
+DHCP Server setup.
+------------------
+
+As I had a DNSMasq DHCP server installed on my OpenWRT router, I reused it as a DHCP
+server for remote boot. I added the following lines to "/etc/dnsmasq.conf" file at
+the DHCP server:
+
+! dhcp-option=option:router,172.30.0.1
+! dhcp-option=6,172.30.0.1
+! dhcp-option=15,lan
+! dhcp-option=17,/var/lib/tftpboot
+! 
+! tftp-root=/var/lib/tftpboot
+! dhcp-boot=/var/lib/tftpboot/x86/pulsar,tpx61t,172.30.0.101
+
+Here "tftp-root" sets up the tftp server root (but it seems to be for a "dnsmasq"
+built-in tftp server, which I don't use in my setup. Instead, I set up a tftp server
+on my development machine).
+
+"dhcp-boot" sets up the path to a boot loader. Genode currently uses "Pulsar" as a 
+PXE loader. It is very small and supports the multiboot protocol, like GRUB does.
+Here we can see the path to the bootloader on the tftp server, followed by a tftp
+server hostname and IP address, separated by commas.
+
+Also, here are the following DHCP options used:
+
+# "router": the IP gateway address
+# 6: DNS server address
+# 15: local domain
+# 17: root-path: TFTP server root
+
+
+TFTP server setup.
+------------------
+
+As a tftp server, I use tftpd-hpa. The Debian package is named the same way My 
+settings in "/etc/default/tftpd-hpa" are as follows:
+
+! TFTP_USERNAME="tftp"
+! TFTP_DIRECTORY="/var/lib/tftpboot"
+! TFTP_ADDRESS=":69"
+! # TFTP_OPTIONS="--secure --listen"
+! TFTP_OPTIONS="--verbosity 4"
+
+Here we have "--secure" option disabled, so tftp server does not use chroot, but uses
+absolute pathnames instead. Set TFTP_USERNAME to your tftp server's user. This user 
+should be able to access your build directory, so you should set up permissions 
+accordingly.
+
+Booting your test machine.
+--------------------------
+
+Now, you should put "pulsar" binary and its config file in the form:
+"config-<your-mac-address-bytes-delimited-by-dashes>":
+
+! # tftp 172.30.0.101
+! root /var/lib/tftpboot/x86
+! config config-00-00-00-00-00-00
+
+The "root" command changes the root directory for "pulsar" to your build directory
+(pointed to by the /var/lib/tftpboot/x86 symlink). Then it switches to the new 
+config file "config-00-00-00-00-00-00" located there. The build system automatically
+creates the "config-00-00-00-00-00-00" file in the build directory root, which, in 
+turn, points to an config-52-54-00-12-34-56 file in /var/lib/tftpboot/x86/var/run/sculpt_test
+directory, in case you issued a
+
+! make KERNEL=nova run/sculpt_test
+
+command in your build directory. Now if you typed the above command, the Sculpt image
+should be built from sources, then the build system creates a bootable image, all 
+required symlinks and configs. Then the test machine is powered on, the image is loaded
+to it via network, it starts up, and you'll see a Genode log on your development
+machine.
+
+
+Known problems.
+---------------
+
+During my attempts to boot Sculpt remotely, I encountered a problem: I had an NX bit
+disabled in my BIOS setup. This caused most 64-bit kernels to reboot or trap. 32-bit
+kernels booted successfully, though, because NX bit (aka Execute Prevention) is usually
+enabled on 32-bit systems only in conjunction with PAE feature, which was disabled in
+most used kernels, and these kernels don't expect it to be enabled, unlike 64-bit ones.
+So, the advice is to not disable the "Execute Prevention" in BIOS.
+
+
+Credits:
+--------
+
+* Alexander Boettcher for pointing me at my fault with the NX bit disabled 
+* Christian Chelmuth and Josef Soentgen on #genode irc channel, for helping me to get
+a working setup with AMT SOL and PXE boot.

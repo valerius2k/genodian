@@ -20,10 +20,11 @@ tool uses Intel AMT for:
 # getting the log output via AMT SOL (Serial over LAN) COM port.
 
 Intel AMT is a remote management technology. Most newer machines (IIRC, 
-all Intel Core i5/i7/Xeon machines) have Intel Management Engine built-in.
-Intel AMT is just one module of Intel ME. Intel ME has a chip with
-its own firmware (based on Minix3). The firmware has its own IP stack with
-a HTTP, VNC servers, and a SOL (Serial over LAN) service.
+all Intel Core i5/i7/Xeon machines having a "vPRO" label in their specs)
+have Intel  Management Engine built-in. Intel AMT is just one module of 
+Intel ME. Intel ME has a chip with its own firmware (based on Minix3). 
+The firmware has its own IP stack with a HTTP, VNC servers, and a SOL 
+(Serial over LAN) service.
 
 After you go to BIOS setup and enable Intel AMT, and enable required 
 services and configure IP stack, you'll have a second IP enabled on your

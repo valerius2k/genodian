@@ -52,7 +52,7 @@ Then you need to set up a valid Intel ME password. The default user is
 "secure" password, the setup will refuse to do anything on.
 
 The valid password is "P@ssw0rd", but "Passw0rd" is insufficiently secure.
-So, you should use a password, using letters of a different case, plus some
+So, you should use a password, using letters of a mixed case, plus some
 numbers, plus some symbols like "@#$%". Otherwise the setup will consider it
 being insufficiently secure.
 
@@ -111,7 +111,8 @@ So, for using PXE and Intel AMT, you should comment the "power_on/qemu", "log/qe
 and "image/iso" backends in your "etc/build.conf" in your build directory and add
 the following section instead:
 
-! # QEMU_RUN_OPT := --include power_on/qemu  --include log/qemu --include image/iso
+! # QEMU_RUN_OPT := --include power_on/qemu  \
+!                   --include log/qemu --include image/iso
 ! RUN_OPT := --include power_on/amt \
 !                   --power-on-amt-host 172.30.0.140 \
 !                   --power-on-amt-password 'P@ssw0rd' \
@@ -130,9 +131,9 @@ Also, it is useful to increase the power on timeout to 20 seconds, because by de
 the timeout is as small as 5 seconds, which could be insufficient.
 
 The "--load-tftp-absolute" enables absolute paths passed by the run tool to a tftp 
-server. "--load-tftp-base-dir" sets up the tftp server root. The build system creates a
+server. "--load-tftp-base-dir" sets the tftp server root. The build system creates a
 "x86" symlink, pointing to your build directory, in the TFTP root. The name of this
-symlink is set up in the "--load-tftp-offset-dir" parameter.
+symlink is set in the "--load-tftp-offset-dir" parameter.
 
 Also, my config contains the "--amt-tool wsman" parameter, which seems to be not 
 mandatory, but I have it. In addition to "amtterm", the run tool uses a "wsman"

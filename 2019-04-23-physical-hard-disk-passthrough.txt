@@ -1,0 +1,208 @@
+       Physical Hard Disk Passthrough in Genode's version of VirtualBox.
+
+Here, I'll describe how to set up Linux booting from the physical Hard disk, and
+mounting several partitions. Here: [ http://genodians.org/skalk/2019-03-18-hybrid-packages ]
+described how to tweak VirtualBox for using your physical hard disk as a single "Block"
+session, and accessing it in an exclusive fashion. The disadvantage is that VirtualBox
+uses all your hard disk exclusively, so you will be unable to use it in Sculpt for your
+GENODE partition. In other words, Your GENODE partition should be on a separate hard
+disk, or a flash stick. This may be inconvenient. So, I found how I could give to VBox
+a selected set of partitions only (/dev/sda9 being Linux root partition, /dev/sda8 being
+a Linux swap partition, /dev/sda7 was my data partition with Genode sources, formatted
+with JFS file system and /dev/sda1 was my second data partition, formatted as FAT32).
+And /dev/sda11 was my Genode partition.
+
+The Sculpt manager creates policies for part_block, to create separate "Block" sessions
+for each of your hard disk partitions, so they will be, in turn, accessible as separate
+virtual unpartitioned hard disks. Linux can support multiple unpartitioned hard disks, so
+they will be accessible as /dev/sda .. /dev/sdd. The disadvantage is that if you'll need
+to swap your /etc/fstab files when rebooting between a VM and a real hardware. (also, I
+needed to swap /etc/network/interfaces too, because on a real machine I have a wifi,
+interface, whereas in a VM I have eth0). So, you just create two copies of that two
+files, and swap them every time you reboot. Two fstab's differ in that /dev/sda9 is
+changed to /dev/sda, /dev/sda8 to /dev/sdb, /dev/sda7 to /dev/sdc and /dev/sda1 to
+/dev/sdd, and all other partitions, inaccessible in a VM (which you didn't passed
+through into a VM) are just commented-out.
+
+This is of course, not very convenient, so, an ideal solution would be an idea,
+suggested by cnuke: a block session aggregator, which acts like a part_block, but
+in a reverse direction: it should take several "Block" sessions, and compose them
+in a virtual hard disk, where each separate block session is added at some specified
+LBA (e.g., an offset is added to each "Block" session block number). And additionally,
+it should add a bootloader at a zero track. The bootloader image could be available
+as a separate "ROM" session.
+
+Though, that component is not yet implemented, so, we still miss a boot loader in
+out setup. Original hard disk on a real hardware, of course, has GRUB2 installed
+in a zero track. The GRUB files are installed into /boot/grub. But we could try
+installing GRUB into the Linux partition's partition boot record. So, when booting
+in a VM, it will boot from the PBR, and when booting on a real hardware, it will
+boot from an MBR. /boot/grub will be shared in these two cases (including grub.cfg
+config file). All you need is to make Linux booting in a VM from a CD (if you used
+a "download_debian" downloader, you should have a Linux ISO image).
+
+The first thing you need is adding appropriate "Block" sessions to your VBox
+configuration. First, open your /depot/genodelabs/raw/vbox5-nova-sculpt/<version>/init.config
+in "vim" from the "inspect" window and add <service name="Block"/> to your <parent-provides>
+section, plus you'll need to modify your VBox VFS configuration as follows:
+
+! ...
+! <config vbox_file="machine.vbox" xhci="yes" vm_name="linux" capslock="ROM">
+!   <vfs>
+!     <dir name="dev">
+!       <log/>
+!       <rtc/>
+!       <block name="sda" label="7" block_buffer_count="128"/>
+!       <block name="sdb" label="9" block_buffer_count="128"/>
+!       <block name="sdc" label="1" block_buffer_count="128"/>
+!       <block name="sdd" label="8" block_buffer_count="128"/>
+!     </dir>
+!     <dir name="shared"> <fs label="shared" writeable="yes"/> </dir>
+!     <fs writeable="yes"/>
+!   </vfs>
+!   <libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc"/>
+! </config>
+! <route>
+!   <service name="Block"> <parent/> </service>
+!   ...
+! </route>
+! ...
+
+Here, in each "block" node, name="sda" specifies a /dev/sda "Block" file in the VFS, label="7"
+specifies that for a "Block" session with label "7" will be created. The "part_block" server
+in the "runtime" subsystem creates several "Block" sessions. The session with label "7" corresponds
+to a seventh partition. Also, as you can see here, a block session is routed to parent of VBox's
+init, which is a "init" instance managing the "runtime" subsystem.
+
+Also, what you should do is to add the <block/> node to your /depot/genodelabs/pkg/vbox5-nova-sculpt/<version>/runtime
+<requires> section. This will cause Sculpt manager to ask you about which "Block" session you need
+to give to your VBox subsystem. But you need four "Block" sessions, labeled "7", "9", "1", and "8".
+To route them to "part_block" component with proper session labels, you'll need a launcher. So, you
+need to create a file /config/launcher/Debian9 with the following contents:
+
+! <launcher pkg="genodelabs/pkg/vbox5-nova-sculpt/<version>">
+!   <route>
+!     <service name="Block" label_suffix=" -> 7">
+!       <child name="ahci-0.part_block" label="7"/>
+!     </service>
+!     <service name="Block" label_suffix=" -> 9">
+!       <child name="ahci-0.part_block" label="9"/>
+!     </service>
+!     <service name="Block" label_suffix=" -> 1">
+!       <child name="ahci-0.part_block" label="1"/>
+!     </service>
+!     <service name="Block" label_suffix=" -> 8">
+!       <child name="ahci-0.part_block" label="8"/>
+!     </service>
+!     <service name="Audio_in">  <child name="bsd_audio_drv"/> </service>
+!     <service name="Audio_out"> <child name="bsd_audio_drv"/> </service>
+!     <service name="File_system" label="vm"> <child name="vm_fs"/> </service>
+!     <service name="File_system" label="shared"> <child name="shared_fs"/> </service>
+!     <service name="Nitpicker"> <child name="wm"/> </service>
+!     <service name="Nic"> <child name="nic_router"/> </service>
+!     <service name="ROM" label="capslock"> <parent label="capslock"/> </service>
+!     <service name="ROM" label="platform_info"> <parent/> </service>
+!     <service name="ROM" label="usb_devices"> <child name="usb_devices_rom"/> </service>
+!     <service name="Report" label="shape"> <child name="wm"/> </service>
+!     <service name="Report"> <parent/> </service>
+!     <service name="RM"> <parent/> </service>
+!     <service name="Rtc"> <parent/> </service>
+!     <service name="Usb"> <parent/> </service>
+!   </route>
+! </launcher>
+
+Here you can see that "Block" sessions with labels ending with " -> 7" are redirected to part_block
+child with a label being just "7". "Audio_in" and "Audio_out" sessions are redirected to "bsd_audio_drv"
+child (an OpenBSD audio driver). "Nitpicker" service and "Report" service with "shape" label are
+redirected to a window manager (which is "wm" in my case. In your case, it could also be "themed_wm").
+Services implemented in "drivers" subsystem, are routed to parent.
+
+For everything to be working, you need to create the raw .vmdk files for each of your partitions
+in your Linux, and add them to your VBox .vbox config file. So, you'll need to reboot to your
+Linux on your physical machine first, and execute a command:
+
+! VBoxManage internalcommands createrawvmdk -filename data.vmdk -rawdisk /dev/sda7
+
+It will create a "data.vmdk" config file, which references your /dev/sda7 partition. You'll
+need to open this file with your favourite text editor, and change /dev/sda7 to /dev/sda.
+Then, you'll need to open your machine.vbox and change the MediaRegistry node the following
+way:
+
+!    <MediaRegistry>
+!      <HardDisks>
+!        <!-- <HardDisk uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}" location="/machine.vdi" format="VDI" type="Normal"/> -->
+!        <HardDisk uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}" location="/root2.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{d9c03893-c2c3-4e60-b93b-2b011e93ea0f}" location="/data.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{01f7648d-07fe-453e-9e1d-0b8456f8c25f}" location="/exch.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}" location="/swap.vmdk" format="VMDK" type="Normal"/>
+!     </HardDisks>
+!      <DVDImages>
+!        <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}" location="/installer.iso"/>
+!        <!-- <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}" location="/VBoxGuestAdditions_6.0.0_RC1.iso"/> -->
+!     </DVDImages>
+!    </MediaRegistry>
+
+And additionally, you'll need to add the UUID's of your hard disks to StorageControllers section:
+
+!    <StorageControllers>
+!      <StorageController name="SATA" type="AHCI" PortCount="6" useHostIOCache="true" Bootable="true" IDE0MasterEmulationPort="0" IDE0SlaveEmulationPort="1" IDE1MasterEmulationPort="2" IDE1SlaveEmulationPort="3">
+!        <AttachedDevice type="HardDisk" port="0" device="0">
+!          <!-- <Image uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}"/> -->
+!          <Image uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}"/>
+!        </AttachedDevice>
+!        <AttachedDevice type="HardDisk" port="1" device="0">
+!          <Image uuid="{d9c03893-c2c3-4e60-b93b-2b011e93ea0f}"/>
+!        </AttachedDevice>
+!        <AttachedDevice type="HardDisk" port="2" device="0">
+!          <Image uuid="{01f7648d-07fe-453e-9e1d-0b8456f8c25f}"/>
+!        </AttachedDevice>
+!        <AttachedDevice type="HardDisk" port="4" device="0">
+!          <Image uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}"/>
+!        </AttachedDevice>
+!        <AttachedDevice passthrough="false" type="DVD" port="3" device="0">
+!          <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}"/>
+!        </AttachedDevice>
+!      </StorageController>
+!    </StorageControllers>
+
+Note that here we needed to increase a SATA port number to 6 to be able to add 5 devices.
+
+So, you add your .vmdk files here, instead of /machine.vdi. As UUID's for your media, you can use
+UUID's copied from your .vmdk files. Note that here I added two CD/DVD images, for Debian installer
+and VBox additions, respectively (the second one being commented-out).
+
+So, You can try booting from the Debian installer ISO image. Then you go to the command line, chroot
+to your Linux partition:
+
+! mount /dev/sda /mnt
+! cd /mnt
+! chroot .
+
+From here, you can install GRUB2 into your /dev/sda partiton:
+
+! grub-install --force /dev/sda
+
+Note that here we're specified a --force flag. Without it, grub-install will complain that
+you're installing GRUB onto an ext2/ext3/ext4 partitions, and it doesn't support embedding,
+except for "block-list" mode, which is unreliable. So, it will advice you to install itself
+into MBR. But we have no such possibility, so we use --force to force installation into PBR.
+This is the case with ext2/ext3/ext4 partitions, which have only two sectors allocated for
+the boot block, so it is insufficient to embed some bootloaders, like GRUB. So, GRUB uses
+a bootsector which loads a boot block from a file with a hardcoded list of blocks. Other
+file systems like FAT32, NTFS or JFS has more sectors available for a boot block.
+
+Now you need to comment the debian installer out in your machine.vbox and uncomment an
+additions ISO. So, you should now be able to boot from the hard disk.
+
+Having everything setup, you now should be able to start the "Debian9" subsystem from
+a launcher in the "+" menu. Note that, if you need to experiment with your setup, you'll
+need to copy /depot/genodelabs/pkg to /depot/local/pkg and /depot/genodelabs/raw to
+/depot/local/raw. Also, you'll need to modify your /depot/local/pkg/vbox5-nova-sculpt/<version>/archives
+(change "genodelabs/raw/..." to "local/raw/..."). From now, your config files will be loaded
+from depot user "local", instead of your regular user, so, it will not be cached. Otherwise,
+your config files will be cached by "fs_cached_rom" component, and you'll need to reboot
+each time to use the actual config versions. See [ http://genodians.org/jws/2019-01-28-depot-local ]
+for more information on how to test your components with depot user "local".
+
+P.S. Thanks go to Josef Soentgen and Alexander Boettcher for help on getting everything
+to work.

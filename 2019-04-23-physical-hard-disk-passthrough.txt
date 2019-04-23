@@ -15,7 +15,7 @@ And /dev/sda11 was my Genode partition.
 The Sculpt manager creates policies for part_block, to create separate "Block" sessions
 for each of your hard disk partitions, so they will be, in turn, accessible as separate
 virtual unpartitioned hard disks. Linux can support multiple unpartitioned hard disks, so
-they will be accessible as /dev/sda .. /dev/sdd. The disadvantage is that if you'll need
+they will be accessible as /dev/sda .. /dev/sdd. The disadvantage is that you'll need
 to swap your /etc/fstab files when rebooting between a VM and a real hardware. (also, I
 needed to swap /etc/network/interfaces too, because on a real machine I have a wifi,
 interface, whereas in a VM I have eth0). So, you just create two copies of that two
@@ -27,14 +27,14 @@ through into a VM) are just commented-out.
 This is of course, not very convenient, so, an ideal solution would be an idea,
 suggested by cnuke: a block session aggregator, which acts like a part_block, but
 in a reverse direction: it should take several "Block" sessions, and compose them
-in a virtual hard disk, where each separate block session is added at some specified
-LBA (e.g., an offset is added to each "Block" session block number). And additionally,
+into a virtual hard disk, where each separate block session is added at some specified
+LBA (i.e., an offset is added to each "Block" session block number). And additionally,
 it should add a bootloader at a zero track. The bootloader image could be available
 as a separate "ROM" session.
 
 Though, that component is not yet implemented, so, we still miss a boot loader in
 out setup. Original hard disk on a real hardware, of course, has GRUB2 installed
-in a zero track. The GRUB files are installed into /boot/grub. But we could try
+into a zero track. The GRUB files are installed into /boot/grub. But we could try
 installing GRUB into the Linux partition's partition boot record. So, when booting
 in a VM, it will boot from the PBR, and when booting on a real hardware, it will
 boot from an MBR. /boot/grub will be shared in these two cases (including grub.cfg
@@ -68,11 +68,11 @@ section, plus you'll need to modify your VBox VFS configuration as follows:
 ! </route>
 ! ...
 
-Here, in each "block" node, name="sda" specifies a /dev/sda "Block" file in the VFS, label="7"
-specifies that for a "Block" session with label "7" will be created. The "part_block" server
+Here, in each "<block/>" node, name="sda" specifies a /dev/sda "Block" file in the VFS, label="7"
+specifies that a "Block" session with label "7" will be created. The "part_block" server
 in the "runtime" subsystem creates several "Block" sessions. The session with label "7" corresponds
 to a seventh partition. Also, as you can see here, a block session is routed to parent of VBox's
-init, which is a "init" instance managing the "runtime" subsystem.
+init, which is an "init" instance managing the "runtime" subsystem.
 
 Also, what you should do is to add the <block/> node to your /depot/genodelabs/pkg/vbox5-nova-sculpt/<version>/runtime
 <requires> section. This will cause Sculpt manager to ask you about which "Block" session you need
@@ -111,11 +111,18 @@ need to create a file /config/launcher/Debian9 with the following contents:
 !   </route>
 ! </launcher>
 
-Here you can see that "Block" sessions with labels ending with " -> 7" are redirected to part_block
+Here you can see that "Block" session with label ending with " -> 7" is redirected to part_block
 child with a label being just "7". "Audio_in" and "Audio_out" sessions are redirected to "bsd_audio_drv"
 child (an OpenBSD audio driver). "Nitpicker" service and "Report" service with "shape" label are
 redirected to a window manager (which is "wm" in my case. In your case, it could also be "themed_wm").
 Services implemented in "drivers" subsystem, are routed to parent.
+
+You should copy your launcher as follows:
+
+! cp /config/launcher/Debian9 /ahci-0.11/config/<Sculpt_version>/launcher
+
+if you need it to be persistent. Otherwise, it will be destroyed on next reboot as
+it is in a temporary storage (ramdisk).
 
 For everything to be working, you need to create the raw .vmdk files for each of your partitions
 in your Linux, and add them to your VBox .vbox config file. So, you'll need to reboot to your
@@ -142,6 +149,10 @@ way:
 !     </DVDImages>
 !    </MediaRegistry>
 
+So, you add your .vmdk files here, instead of /machine.vdi. As UUID's for your media, you can use
+UUID's copied from your .vmdk files. Note that here I added two CD/DVD images, for Debian installer
+and VBox additions, respectively (the second one being commented-out).
+
 And additionally, you'll need to add the UUID's of your hard disks to StorageControllers section:
 
 !    <StorageControllers>
@@ -167,11 +178,7 @@ And additionally, you'll need to add the UUID's of your hard disks to StorageCon
 
 Note that here we needed to increase a SATA port number to 6 to be able to add 5 devices.
 
-So, you add your .vmdk files here, instead of /machine.vdi. As UUID's for your media, you can use
-UUID's copied from your .vmdk files. Note that here I added two CD/DVD images, for Debian installer
-and VBox additions, respectively (the second one being commented-out).
-
-So, You can try booting from the Debian installer ISO image. Then you go to the command line, chroot
+So, you can try booting from the Debian installer ISO image. Then you go to the command line, chroot
 to your Linux partition:
 
 ! mount /dev/sda /mnt
@@ -183,22 +190,52 @@ From here, you can install GRUB2 into your /dev/sda partiton:
 ! grub-install --force /dev/sda
 
 Note that here we're specified a --force flag. Without it, grub-install will complain that
-you're installing GRUB onto an ext2/ext3/ext4 partitions, and it doesn't support embedding,
+you're installing GRUB onto an ext2/ext3/ext4 partition, and it doesn't support embedding,
 except for "block-list" mode, which is unreliable. So, it will advice you to install itself
 into MBR. But we have no such possibility, so we use --force to force installation into PBR.
 This is the case with ext2/ext3/ext4 partitions, which have only two sectors allocated for
 the boot block, so it is insufficient to embed some bootloaders, like GRUB. So, GRUB uses
 a bootsector which loads a boot block from a file with a hardcoded list of blocks. Other
-file systems like FAT32, NTFS or JFS has more sectors available for a boot block.
+file systems like FAT32, NTFS or JFS have more sectors available for a boot block.
 
 Now you need to comment the debian installer out in your machine.vbox and uncomment an
 additions ISO. So, you should now be able to boot from the hard disk.
+
+Also, what you miss now is a boot entry in your GRUB, for loading Linux from your virtual
+/dev/sda hard disk. For that, you'll need to copy your regular GRUB boot entry for your
+physical hard disk Linux installation and change the "root" variable for your Linux boot
+partition from
+
+! set root='hd0,msdos9'
+
+to
+
+! set root='hd0'
+
+and
+
+! root=/dev/sda9
+
+to
+
+! root=/dev/sda
+
+and
+
+! resume=/dev/sda8
+
+to
+
+! resume=/dev/sdd
+
+in your Linux kernel command line.
 
 Having everything setup, you now should be able to start the "Debian9" subsystem from
 a launcher in the "+" menu. Note that, if you need to experiment with your setup, you'll
 need to copy /depot/genodelabs/pkg to /depot/local/pkg and /depot/genodelabs/raw to
 /depot/local/raw. Also, you'll need to modify your /depot/local/pkg/vbox5-nova-sculpt/<version>/archives
-(change "genodelabs/raw/..." to "local/raw/..."). From now, your config files will be loaded
+(change "genodelabs/raw/..." to "local/raw/...") and pkg="genodelabs/pkg..." to
+pkg="local/pkg/..." in your launcher. From now, your config files will be loaded
 from depot user "local", instead of your regular user, so, it will not be cached. Otherwise,
 your config files will be cached by "fs_cached_rom" component, and you'll need to reboot
 each time to use the actual config versions. See [ http://genodians.org/jws/2019-01-28-depot-local ]

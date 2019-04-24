@@ -48,7 +48,7 @@ section, plus you'll need to modify your VBox VFS configuration as follows:
 
 ! ...
 ! <config vbox_file="machine.vbox" xhci="yes"
-               vm_name="linux" capslock="ROM">
+!              vm_name="linux" capslock="ROM">
 !   <vfs>
 !     <dir name="dev">
 !       <log/>
@@ -152,15 +152,20 @@ way:
 !    <MediaRegistry>
 !      <HardDisks>
 !        <!-- <HardDisk uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}"
-!                       location="/machine.vdi" format="VDI" type="Normal"/> -->
+!                       location="/machine.vdi" format="VDI"
+!                       type="Normal"/> -->
 !        <HardDisk uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}"
-!                       location="/root2.vmdk" format="VMDK" type="Normal"/>
+!                       location="/root2.vmdk" format="VMDK"
+!                       type="Normal"/>
 !        <HardDisk uuid="{d9c03893-c2c3-4e60-b93b-2b011e93ea0f}"
-!                       location="/data.vmdk" format="VMDK" type="Normal"/>
+!                       location="/data.vmdk" format="VMDK"
+!                       type="Normal"/>
 !        <HardDisk uuid="{01f7648d-07fe-453e-9e1d-0b8456f8c25f}"
-!                       location="/exch.vmdk" format="VMDK" type="Normal"/>
+!                       location="/exch.vmdk" format="VMDK"
+!                       type="Normal"/>
 !        <HardDisk uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}"
-!                       location="/swap.vmdk" format="VMDK" type="Normal"/>
+!                       location="/swap.vmdk" format="VMDK"
+!                       type="Normal"/>
 !     </HardDisks>
 !      <DVDImages>
 !        <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}"
@@ -177,9 +182,12 @@ and VBox additions, respectively (the second one being commented-out).
 And additionally, you'll need to add the uuid's of your hard disks to StorageControllers section:
 
 !    <StorageControllers>
-!      <StorageController name="SATA" type="AHCI" PortCount="6" useHostIOCache="true"
-!                         Bootable="true" IDE0MasterEmulationPort="0" IDE0SlaveEmulationPort="1"
-!                         IDE1MasterEmulationPort="2" IDE1SlaveEmulationPort="3">
+!      <StorageController name="SATA" type="AHCI"
+!                         PortCount="6" useHostIOCache="true"
+!                         Bootable="true" IDE0MasterEmulationPort="0"
+!                         IDE0SlaveEmulationPort="1"
+!                         IDE1MasterEmulationPort="2"
+!                         IDE1SlaveEmulationPort="3">
 !        <AttachedDevice type="HardDisk" port="0" device="0">
 !          <!-- <Image uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}"/> -->
 !          <Image uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}"/>
@@ -193,7 +201,8 @@ And additionally, you'll need to add the uuid's of your hard disks to StorageCon
 !        <AttachedDevice type="HardDisk" port="4" device="0">
 !          <Image uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}"/>
 !        </AttachedDevice>
-!        <AttachedDevice passthrough="false" type="DVD" port="3" device="0">
+!        <AttachedDevice passthrough="false" type="DVD"
+!                        port="3" device="0">
 !          <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}"/>
 !        </AttachedDevice>
 !      </StorageController>

@@ -5,7 +5,7 @@ mounting several partitions. Here: [ http://genodians.org/skalk/2019-03-18-hybri
 described how to tweak VirtualBox for using your physical hard disk as a single "Block"
 session, and accessing it in an exclusive fashion. The disadvantage is that VirtualBox
 uses all your hard disk exclusively, so you will be unable to use it in Sculpt for your
-GENODE partition. In other words, Your GENODE partition should be on a separate hard
+GENODE partition. In other words, your GENODE partition should be on a separate hard
 disk, or a flash stick. This may be inconvenient. So, I found how I could give to VBox
 a selected set of partitions only (/dev/sda9 being Linux root partition, /dev/sda8 being
 a Linux swap partition, /dev/sda7 was my data partition with Genode sources, formatted
@@ -16,7 +16,7 @@ The Sculpt manager creates policies for part_block, to create separate "Block" s
 for each of your hard disk partitions, so they will be, in turn, accessible as separate
 virtual unpartitioned hard disks. Linux can support multiple unpartitioned hard disks, so
 they will be accessible as /dev/sda .. /dev/sdd. The disadvantage is that you'll need
-to swap your /etc/fstab files when rebooting between a VM and a real hardware. (also, I
+to swap your /etc/fstab files when rebooting between a VM and a real hardware. (Also, I
 needed to swap /etc/network/interfaces too, because on a real machine I have a wifi,
 interface, whereas in a VM I have eth0). So, you just create two copies of that two
 files, and swap them every time you reboot. Two fstab's differ in that /dev/sda9 is
@@ -33,7 +33,7 @@ it should add a bootloader at a zero track. The bootloader image could be availa
 as a separate "ROM" session.
 
 Though, that component is not yet implemented, so, we still miss a boot loader in
-out setup. Original hard disk on a real hardware, of course, has GRUB2 installed
+our setup. Original hard disk on a real hardware, of course, has GRUB2 installed
 into a zero track. The GRUB files are installed into /boot/grub. But we could try
 installing GRUB into the Linux partition's partition boot record. So, when booting
 in a VM, it will boot from the PBR, and when booting on a real hardware, it will
@@ -47,7 +47,8 @@ in "vim" from the "inspect" window and add <service name="Block"/> to your <pare
 section, plus you'll need to modify your VBox VFS configuration as follows:
 
 ! ...
-! <config vbox_file="machine.vbox" xhci="yes" vm_name="linux" capslock="ROM">
+! <config vbox_file="machine.vbox" xhci="yes"
+               vm_name="linux" capslock="ROM">
 !   <vfs>
 !     <dir name="dev">
 !       <log/>
@@ -96,14 +97,24 @@ need to create a file /config/launcher/Debian9 with the following contents:
 !     </service>
 !     <service name="Audio_in">  <child name="bsd_audio_drv"/> </service>
 !     <service name="Audio_out"> <child name="bsd_audio_drv"/> </service>
-!     <service name="File_system" label="vm"> <child name="vm_fs"/> </service>
-!     <service name="File_system" label="shared"> <child name="shared_fs"/> </service>
+!     <service name="File_system" label="vm">
+!        <child name="vm_fs"/>
+!     </service>
+!     <service name="File_system" label="shared">
+!        <child name="shared_fs"/>
+!     </service>
 !     <service name="Nitpicker"> <child name="wm"/> </service>
 !     <service name="Nic"> <child name="nic_router"/> </service>
-!     <service name="ROM" label="capslock"> <parent label="capslock"/> </service>
+!     <service name="ROM" label="capslock">
+!        <parent label="capslock"/>
+!     </service>
 !     <service name="ROM" label="platform_info"> <parent/> </service>
-!     <service name="ROM" label="usb_devices"> <child name="usb_devices_rom"/> </service>
-!     <service name="Report" label="shape"> <child name="wm"/> </service>
+!     <service name="ROM" label="usb_devices">
+!        <child name="usb_devices_rom"/>
+!     </service>
+!     <service name="Report" label="shape">
+!        <child name="wm"/>
+!     </service>
 !     <service name="Report"> <parent/> </service>
 !     <service name="RM"> <parent/> </service>
 !     <service name="Rtc"> <parent/> </service>
@@ -111,15 +122,16 @@ need to create a file /config/launcher/Debian9 with the following contents:
 !   </route>
 ! </launcher>
 
-Here you can see that "Block" session with label ending with " -> 7" is redirected to part_block
-child with a label being just "7". "Audio_in" and "Audio_out" sessions are redirected to "bsd_audio_drv"
+Here you can see that "Block" session with label ending with " -> 7" is redirected to _part_block_
+child with a label being just "7". "Audio_in" and "Audio_out" sessions are redirected to _bsd_audio_drv_
 child (an OpenBSD audio driver). "Nitpicker" service and "Report" service with "shape" label are
-redirected to a window manager (which is "wm" in my case. In your case, it could also be "themed_wm").
+redirected to a window manager (which is _wm_ in my case. In your case, it could also be _themed_wm_).
 Services implemented in "drivers" subsystem, are routed to parent.
 
 You should copy your launcher as follows:
 
-! cp /config/launcher/Debian9 /ahci-0.11/config/<Sculpt_version>/launcher
+! cp /config/launcher/Debian9 \
+!     /ahci-0.11/config/<Sculpt_version>/launcher
 
 if you need it to be persistent. Otherwise, it will be destroyed on next reboot as
 it is in a temporary storage (ramdisk).
@@ -128,35 +140,46 @@ For everything to be working, you need to create the raw .vmdk files for each of
 in your Linux, and add them to your VBox .vbox config file. So, you'll need to reboot to your
 Linux on your physical machine first, and execute a command:
 
-! VBoxManage internalcommands createrawvmdk -filename data.vmdk -rawdisk /dev/sda7
+! VBoxManage internalcommands createrawvmdk \
+!          -filename data.vmdk \
+!          -rawdisk /dev/sda7
 
 It will create a "data.vmdk" config file, which references your /dev/sda7 partition. You'll
 need to open this file with your favourite text editor, and change /dev/sda7 to /dev/sda.
-Then, you'll need to open your machine.vbox and change the MediaRegistry node the following
+Then, you'll need to open your machine.vbox and change the MediaRegistry node in the following
 way:
 
 !    <MediaRegistry>
 !      <HardDisks>
-!        <!-- <HardDisk uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}" location="/machine.vdi" format="VDI" type="Normal"/> -->
-!        <HardDisk uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}" location="/root2.vmdk" format="VMDK" type="Normal"/>
-!        <HardDisk uuid="{d9c03893-c2c3-4e60-b93b-2b011e93ea0f}" location="/data.vmdk" format="VMDK" type="Normal"/>
-!        <HardDisk uuid="{01f7648d-07fe-453e-9e1d-0b8456f8c25f}" location="/exch.vmdk" format="VMDK" type="Normal"/>
-!        <HardDisk uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}" location="/swap.vmdk" format="VMDK" type="Normal"/>
+!        <!-- <HardDisk uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}"
+!                       location="/machine.vdi" format="VDI" type="Normal"/> -->
+!        <HardDisk uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}"
+!                       location="/root2.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{d9c03893-c2c3-4e60-b93b-2b011e93ea0f}"
+!                       location="/data.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{01f7648d-07fe-453e-9e1d-0b8456f8c25f}"
+!                       location="/exch.vmdk" format="VMDK" type="Normal"/>
+!        <HardDisk uuid="{d9d4ffcd-88ae-49bb-b067-605c5e6c8516}"
+!                       location="/swap.vmdk" format="VMDK" type="Normal"/>
 !     </HardDisks>
 !      <DVDImages>
-!        <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}" location="/installer.iso"/>
-!        <!-- <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}" location="/VBoxGuestAdditions_6.0.0_RC1.iso"/> -->
+!        <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}"
+!                       location="/installer.iso"/>
+!        <!-- <Image uuid="{81763434-9a51-49e8-9444-528a5a28c4bc}"
+!                       location="/VBoxGuestAdditions_6.0.0_RC1.iso"/> -->
 !     </DVDImages>
 !    </MediaRegistry>
 
-So, you add your .vmdk files here, instead of /machine.vdi. As UUID's for your media, you can use
-UUID's copied from your .vmdk files. Note that here I added two CD/DVD images, for Debian installer
+So, you add your .vmdk files here, instead of /machine.vdi. As uuid's for your media, you can use
+uuid's copied from your .vmdk files. Note that here I added two CD/DVD images, for Debian installer
 and VBox additions, respectively (the second one being commented-out).
 
-And additionally, you'll need to add the UUID's of your hard disks to StorageControllers section:
+And additionally, you'll need to add the uuid's of your hard disks to StorageControllers section:
 
 !    <StorageControllers>
-!      <StorageController name="SATA" type="AHCI" PortCount="6" useHostIOCache="true" Bootable="true" IDE0MasterEmulationPort="0" IDE0SlaveEmulationPort="1" IDE1MasterEmulationPort="2" IDE1SlaveEmulationPort="3">
+!      <StorageController name="SATA" type="AHCI" PortCount="6" useHostIOCache="true"
+!                         Bootable="true" IDE0MasterEmulationPort="0" IDE0SlaveEmulationPort="1"
+!                         IDE1MasterEmulationPort="2" IDE1SlaveEmulationPort="3">
 !        <AttachedDevice type="HardDisk" port="0" device="0">
 !          <!-- <Image uuid="{a90a16bf-f724-4321-99df-5498d6e4b796}"/> -->
 !          <Image uuid="{1e2ba1f7-0c30-4d27-835d-1c4c75c4e893}"/>
@@ -189,9 +212,9 @@ From here, you can install GRUB2 into your /dev/sda partiton:
 
 ! grub-install --force /dev/sda
 
-Note that here we're specified a --force flag. Without it, grub-install will complain that
+Note that here we've specified a --force flag. Without it, grub-install will complain that
 you're installing GRUB onto an ext2/ext3/ext4 partition, and it doesn't support embedding,
-except for "block-list" mode, which is unreliable. So, it will advice you to install itself
+except for "block-list" mode, which is unreliable. So, it will advise you to install itself
 into MBR. But we have no such possibility, so we use --force to force installation into PBR.
 This is the case with ext2/ext3/ext4 partitions, which have only two sectors allocated for
 the boot block, so it is insufficient to embed some bootloaders, like GRUB. So, GRUB uses
@@ -201,10 +224,10 @@ file systems like FAT32, NTFS or JFS have more sectors available for a boot bloc
 Now you need to comment the debian installer out in your machine.vbox and uncomment an
 additions ISO. So, you should now be able to boot from the hard disk.
 
-Also, what you miss now is a boot entry in your GRUB, for loading Linux from your virtual
-/dev/sda hard disk. For that, you'll need to copy your regular GRUB boot entry for your
-physical hard disk Linux installation and change the "root" variable for your Linux boot
-partition from
+Also, what you miss now is a boot entry in your GRUB, for loading Linux from your
+virtual /dev/sda hard disk. For that, you'll need to copy your regular GRUB boot
+entry for your physical hard disk Linux installation and change the "root" variable
+for your Linux boot partition from
 
 ! set root='hd0,msdos9'
 
